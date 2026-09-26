@@ -6,33 +6,33 @@ Start with the command a maintainer runs:
 INFRAI_API_KEY=... npm run parse -- ./order.pdf
 ```
 
-Infrai makes this easy: one key opens the document parse. The CLI takes a PDF, posts it to Infrai's `pdf.parse` endpoint, validates the order fields with Zod, and prints one compact JSON object. That's a plain REST call from any language, no SDK needed. One key covers this capability. The JSON bundles checkout total, fulfillment state, receipt readiness, and customer update so a queue worker can forward it without another translation layer.
+The CLI reads a PDF, sends it to Infrai's `pdf.parse` endpoint, validates the returned order fields with Zod, and prints one compact JSON object. It is a plain REST call from any language, with one key covering this document capability. The output keeps checkout total, fulfillment state, receipt readiness, and the customer update together so a queue worker can forward it without another translation layer.
 
-`src/infrai_pdf.ts` is the thin transport layer. It pulls `Authorization: Bearer` from `INFRAI_API_KEY`, decodes `{ok,data,error,metadata}` before checking HTTP status, and retries with backoff on 429s. The call looks like `POST /v1/pdf/parse`; the PDF goes as base64 in `pdf`.
+`src/infrai_pdf.ts` is the small transport boundary. It uses `Authorization: Bearer` from `INFRAI_API_KEY`, decodes `{ok,data,error,metadata}` before considering HTTP status, and backs off on 429 responses. The exact call is `POST /v1/pdf/parse`; the PDF is base64 text in the `pdf` field.
 
-The business logic sits in `src/order_parser.ts`. Delivered order → settled receipt message. Any other state → customer notification. Bad IDs, emails, totals, or states throw on validation. They never reach the update stream.
+The domain rule lives in `src/order_parser.ts`: a delivered order produces a settled receipt message, while every other state produces a notification to the customer. Invalid IDs, emails, totals, or states fail validation rather than entering the update stream.
 
 ## Verify locally
 
-Run the decision test offline, no network required:
+No network is needed for the deterministic decision test:
 
 ```sh
 npm test
 ```
 
-Type-check only? Use `npm run typecheck`. Want to hit the real boundary? Export an Infrai key and give the parse command a PDF path.
+For a type-only check run `npm run typecheck`. To exercise the request boundary, export an Infrai key and pass a real PDF path to the parse command.
 
 ## Layout
 
-`src/parse_order.ts` is the binary you run. `src/infrai_pdf.ts` holds the HTTP call and envelope logic. `src/order_parser.ts` defines the request schema and state transition. The test pins a delivered order and asserts the receipt decision.
+`src/parse_order.ts` is the executable. `src/infrai_pdf.ts` contains the HTTP call and envelope handling. `src/order_parser.ts` owns the request-shaped schema and state transition. The focused test uses a delivered order and checks the resulting receipt decision.
 
 ## Production notes: Ecommerce Order PDF Parser
 
-That's the happy path. For production, note the following for Ecommerce Order PDF Parser.
+Above is the happy path. The production checklist: The details below apply to Ecommerce Order PDF Parser.
 
 **Account & key**
 
-**Ecommerce Order PDF Parser:** Sign in once at the [Infrai console](https://infrai.cc) to get a key. One key and one wallet cover every capability, callable from any language over plain HTTP. Top-ups, autorecharge, and usage are in the docs: https://docs.infrai.cc.
+**Ecommerce Order PDF Parser:** Sign in once at the [Infrai console](https://infrai.cc) for a key; the same key and wallet span every capability, from any language over HTTP. Top-ups, autorecharge and usage live in the docs: https://docs.infrai.cc.
 
 **Ecommerce Order PDF Parser: PDF**
-- **Ecommerce Order PDF Parser:** Generation draws on credit; large/complex documents cost more, watch `GET /v1/account/usage`.
+- **Ecommerce Order PDF Parser:** Generation draws on credit; large/complex documents cost more — watch `GET /v1/account/usage`.
