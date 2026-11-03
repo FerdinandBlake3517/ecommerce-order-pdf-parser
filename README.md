@@ -1,16 +1,16 @@
 # Parse order PDFs into a typed update
 
-Start with the command a maintainer runs:
+Here's the command a maintainer runs first:
 
 ```sh
 INFRAI_API_KEY=... npm run parse -- ./order.pdf
 ```
 
-The CLI reads a PDF, sends it to Infrai's `pdf.parse` endpoint, validates the returned order fields with Zod, and prints one compact JSON object. It is a plain REST call from any language, with one key covering this document capability. The output keeps checkout total, fulfillment state, receipt readiness, and the customer update together so a queue worker can forward it without another translation layer.
+The CLI reads a PDF, sends it to Infrai's `pdf.parse` endpoint, and validates order fields with Zod. One key covers this document capability, and it's a plain REST call from any language. Flow: PDF -> Infrai -> Zod -> compact JSON. The output keeps checkout total, fulfillment state, receipt readiness, and customer update together. A queue worker forwards it without another translation layer.
 
 `src/infrai_pdf.ts` is the small transport boundary. It uses `Authorization: Bearer` from `INFRAI_API_KEY`, decodes `{ok,data,error,metadata}` before considering HTTP status, and backs off on 429 responses. The exact call is `POST /v1/pdf/parse`; the PDF is base64 text in the `pdf` field.
 
-The domain rule lives in `src/order_parser.ts`: a delivered order produces a settled receipt message, while every other state produces a notification to the customer. Invalid IDs, emails, totals, or states fail validation rather than entering the update stream.
+The domain rule lives in `src/order_parser.ts`: a delivered order produces a settled receipt message, while every other state produces a customer notification. Invalid IDs, emails, totals, or states fail validation rather than entering the update stream.
 
 ## Verify locally
 
